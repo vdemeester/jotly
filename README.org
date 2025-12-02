@@ -1,0 +1,162 @@
+#+TITLE: Jotly
+#+AUTHOR: Vincent Demeester
+#+DATE: 2025-12-02
+
+* Overview
+
+An Android journaling application designed as a functional clone of the iOS app "Journelly". Jotly provides a private, timeline-based journaling experience with a local-first philosophy.
+
+* Features
+
+- *Local-First*: All data stored on your device in plain-text Org Mode format
+- *Privacy-Focused*: No account creation, no analytics, no ads
+- *Org Mode Compatible*: Data stored in ~.org~ files for maximum portability
+- *Jetpack Compose UI*: Modern Android UI with Material Design 3
+- *Timeline View*: Chronological scrolling feed of journal entries
+
+* Prerequisites
+
+- [[https://nixos.org/download.html][Nix]] with flakes enabled
+- (Optional) [[https://direnv.net/][direnv]] for automatic environment loading
+
+* Quick Start
+
+** 1. Enter Development Environment
+
+If you have direnv:
+#+BEGIN_SRC bash
+direnv allow
+#+END_SRC
+
+Otherwise, manually enter the Nix shell:
+#+BEGIN_SRC bash
+nix develop
+#+END_SRC
+
+This provides all development tools including:
+- JDK 17
+- Android SDK (API 34)
+- Gradle
+- Kotlin
+- ktlint
+- adb
+
+** 2. Build the Project
+
+#+BEGIN_SRC bash
+nix develop --command ./gradlew build
+#+END_SRC
+
+Or if already in the Nix shell:
+#+BEGIN_SRC bash
+./gradlew build
+#+END_SRC
+
+** 3. Run Tests
+
+Run unit tests:
+#+BEGIN_SRC bash
+nix develop --command ./gradlew test
+#+END_SRC
+
+Run instrumented tests (requires emulator or device):
+#+BEGIN_SRC bash
+nix develop --command ./gradlew connectedAndroidTest
+#+END_SRC
+
+Run linting:
+#+BEGIN_SRC bash
+nix develop --command ./gradlew lint
+#+END_SRC
+
+* Development Commands
+
+** Build Commands
+
+| Command                    | Description                  |
+|----------------------------+------------------------------|
+| ~./gradlew build~          | Full build (compile, test, lint) |
+| ~./gradlew assembleDebug~  | Build debug APK              |
+| ~./gradlew assembleRelease~ | Build release APK            |
+| ~./gradlew clean~          | Clean build artifacts        |
+
+** Test Commands
+
+| Command                          | Description                |
+|----------------------------------+----------------------------|
+| ~./gradlew test~                 | Run unit tests             |
+| ~./gradlew testDebugUnitTest~    | Run debug unit tests       |
+| ~./gradlew testReleaseUnitTest~  | Run release unit tests     |
+| ~./gradlew connectedAndroidTest~ | Run instrumented tests     |
+| ~./gradlew lint~                 | Run lint checks            |
+| ~./gradlew ktlintCheck~          | Check Kotlin code style    |
+| ~./gradlew ktlintFormat~         | Format Kotlin code         |
+
+** Development Commands
+
+| Command                  | Description                 |
+|--------------------------+-----------------------------|
+| ~./gradlew installDebug~ | Install debug APK on device |
+| ~./gradlew uninstallAll~ | Uninstall all variants      |
+| ~adb logcat~             | View device logs            |
+| ~adb devices~            | List connected devices      |
+
+** Code Quality
+
+Pre-commit hooks are automatically installed when entering the Nix shell:
+- *ktlint*: Kotlin code formatting (Compose-aware)
+- *alejandra*: Nix code formatting
+
+To manually run pre-commit hooks:
+#+BEGIN_SRC bash
+pre-commit run --all-files
+#+END_SRC
+
+* Project Structure
+
+#+BEGIN_EXAMPLE
+jotly/
+├── app/                          # Android application module
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/com/vdemeester/jotly/
+│   │   │   │   ├── JotlyApplication.kt
+│   │   │   │   ├── MainActivity.kt
+│   │   │   │   └── ui/theme/
+│   │   │   ├── res/              # Resources
+│   │   │   └── AndroidManifest.xml
+│   │   ├── test/                 # Unit tests
+│   │   └── androidTest/          # Instrumented tests
+│   └── build.gradle.kts
+├── docs/
+│   └── spec.org                  # Project specification
+├── todo.org                      # Development roadmap
+├── flake.nix                     # Nix development environment
+└── build.gradle.kts              # Root build configuration
+#+END_EXAMPLE
+
+* Documentation
+
+- [[file:docs/spec.org][Project Specification]] - Detailed feature requirements and architecture
+- [[file:todo.org][Development Blueprint]] - Step-by-step implementation plan
+
+* Tech Stack
+
+- *Language*: Kotlin
+- *UI*: Jetpack Compose with Material 3
+- *Dependency Injection*: Hilt
+- *Build System*: Gradle (Kotlin DSL)
+- *Min SDK*: 26 (Android 8.0)
+- *Target SDK*: 34 (Android 14)
+- *Development Environment*: Nix Flakes
+
+* Environment Details
+
+The Nix flake provides:
+- *JDK*: OpenJDK 17
+- *Android SDK*: Build Tools 34.0.0, Platform 34, Platform Tools
+- *Gradle*: 8.7
+- *Kotlin*: 2.0.0
+- *Pre-commit Hooks*: ktlint, alejandra
+
+All dependencies are pinned for reproducibility across development environments.
