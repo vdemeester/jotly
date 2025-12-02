@@ -13,16 +13,8 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build and Test (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            runner: ubuntu-latest-arm64
+    name: Build and Test
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
@@ -37,17 +29,17 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-${{ matrix.arch }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-gradle-
+            ${{ runner.os }}-gradle-
 
       - name: Cache Nix store
         uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
         with:
           path: /nix/store
-          key: ${{ runner.os }}-${{ matrix.arch }}-nix-${{ hashFiles('flake.lock') }}
+          key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-nix-
+            ${{ runner.os }}-nix-
 
       - name: Build project
         run: |
@@ -61,7 +53,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: apks-${{ matrix.arch }}
+          name: apks
           path: |
             app/build/outputs/apk/**/*.apk
           retention-days: 7
@@ -70,7 +62,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: test-results-${{ matrix.arch }}
+          name: test-results
           path: |
             app/build/reports/tests/**
             app/build/test-results/**
@@ -107,7 +99,7 @@ jobs:
 
       - name: Run ktlint
         run: |
-          nix develop --command bash -c "ktlint 'app/src/**/*.kt' 'app/src/**/*.kts'"
+          nix develop --command ktlint "app/**/*.kt" "app/**/*.kts"
 
       - name: Run Android lint
         run: |
