@@ -1,0 +1,104 @@
+#+TITLE: Jotly: Android Application Specification
+#+AUTHOR: Gemini Agent
+#+DATE: 2025-12-02
+#+OPTIONS: toc:t num:t
+
+* 1. Overview
+Jotly is an Android application designed to be a functional clone of the iOS app "Journelly". It provides a private, timeline-based journaling experience. The app adheres to a "local-first" philosophy, storing data in a plain-text format compatible with Org Mode, ensuring user privacy and data portability without reliance on proprietary cloud services.
+
+* 2. Core Principles
+- **Local-First:** All data resides on the user's device. Syncing is achieved via user-managed file synchronization (e.g., Syncthing, Nextcloud, Google Drive).
+- **Org Mode Compatibility:** The primary data store is a single `.org` file.
+- **Privacy-Focused:** No account creation, no analytics tracking, and no in-app advertisements.
+- **Simplicity:** A clean, minimal user interface focused on the content feed.
+
+* 3. User Interface (UI)
+
+** 3.1. Visual Theme
+- **System Default:** The app must adhere to the user's system theme (Light/Dark mode) and Material Design guidelines where applicable.
+- **Neutral Palette:** Use a neutral color scheme to maintain a clean, distraction-free environment.
+
+** 3.2. Main Screen (Feed View)
+- **Layout:** A vertical, chronological scrolling list of journal entries.
+- **Entry Cards:** Each entry is displayed as a distinct card containing:
+  - Timestamp/Date.
+  - Location/Weather context (if available).
+  - Entry content (text, images, lists).
+- **Navigation:**
+  - **Search Icon:** Located in the top app bar. Expands to a search input field.
+  - **Floating Action Button (FAB):** Located at the bottom-right (or bottom-center) to initiate entry creation.
+
+** 3.3. Interactions
+- **Swipe Gestures:**
+  - **Swipe Left:** Trigger "Edit" action.
+  - **Swipe Right:** Trigger "Delete" action.
+- **Context Menu:** A "three-dots" menu on each card providing "Edit" and "Delete" options.
+
+* 4. Functional Requirements
+
+** 4.1. Data Management
+- **File Format:** All text content is stored in a single file named `Journelly.org`.
+- **Assets:** Media files are stored in a sidecar directory named `Journelly.org.assets`.
+  - Structure: `Journelly.org.assets/images/`, `Journelly.org.assets/videos/`, etc.
+  - Naming Convention: UUID-based filenames (e.g., `9CB95E09-CD4E-4868-BFE0-F0B129A8356B.jpeg`).
+
+** 4.2. File Location & Setup
+- **First Launch:**
+  - Automatically prompt the user to select a directory or file location for `Journelly.org`.
+- **Settings:**
+  - Provide an option to change the source file path at any time.
+- **Validation & Error Handling:**
+  - **File Not Found:** If the user selects a path where the file does not exist, prompt to:
+    1. Create a new `Journelly.org` file.
+    2. Select a different file.
+  - **Invalid File:** If the user selects an existing file that is not a valid text/org file or cannot be read, display an error message and force re-selection.
+
+** 4.3. Entry Creation (The Editor)
+- **Modal Interface:** Tapping the FAB opens a modal/fullscreen editor.
+- **Rich-Text Support:** A single text area supporting:
+  - **Plain Text:** Standard typing.
+  - **Lists:** Bulleted (`- item`) and checklist (`- [ ] item`) support.
+  - **Images:** Button to insert images from gallery or camera. Images are copied to the assets folder and linked in the Org file.
+  - **Links:** Support for inserting URLs.
+  - **Hashtags:** Auto-parsing of `#tags` typed directly into the text.
+- **Automatic Context:**
+  - Request Android Location permissions.
+  - Fetch and append Location (City/Coordinates) and Weather (Temp/Condition) metadata to the entry upon saving.
+
+** 4.4. Search
+- **Functionality:** Real-time filtering of the feed based on text content and hashtags.
+- **Interface:** Expandable search bar from the top icon.
+
+* 5. Technical Architecture
+
+** 5.1. Tech Stack
+- **Language:** Kotlin.
+- **UI Framework:** Jetpack Compose (recommended) or XML Views.
+- **Data Layer:** File I/O operations tailored for text appending and reading.
+- **Parsing:** Custom parser or lightweight library for Org Mode syntax (headers, timestamps, links).
+
+** 5.2. Org Mode Syntax Support
+The parser must handle at minimum:
+- `* Headlines` (for dates/titles)
+- `[[file:path/to/image.jpg]]` (for images)
+- `- List items`
+- `- [ ] Checkboxes`
+- `:PROPERTIES:` or similar drawers for metadata (Location, Weather).
+
+* 6. Testing Plan
+
+** 6.1. Unit Testing
+- **File I/O:** Verify reading/writing to `Journelly.org` does not corrupt existing data.
+- **Parsing Logic:** Test regex or parser against various Org mode snippets (nested lists, mixed content).
+- **Asset Management:** Ensure unique filename generation and correct folder creation.
+
+** 6.2. UI/Integration Testing
+- **Flows:**
+  - "Fresh Install" -> Select Path -> Create File -> Add Entry -> Verify Feed.
+  - "Change Path" -> Select Invalid File -> Verify Error Prompt.
+- **Gestures:** Test swipe actions on RecyclerView/LazyColumn items.
+
+** 6.3. Edge Cases
+- **Permissions:** Deny location permission -> Verify app saves entry without crashing or context data.
+- **Empty States:** Verify feed appearance with 0 entries.
+- **Large Files:** Performance test with a large `Journelly.org` file (e.g., 1000+ entries).

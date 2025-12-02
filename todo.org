@@ -1,0 +1,231 @@
+#+TITLE: Jotly Development Blueprint & Prompts
+#+AUTHOR: Gemini Agent
+#+DATE: 2025-12-02
+#+OPTIONS: toc:t
+
+* Overview
+This document outlines the step-by-step plan to build "Jotly", an Android clone of Journelly.
+It provides a series of specific prompts designed for a code-generation LLM to implement the application iteratively.
+Each step focuses on a small, testable unit of work, adhering to Test-Driven Development (TDD) principles where possible.
+
+* Phase 1: Infrastructure & Data Layer Foundation
+** Step 1: Project Initialization & Nix Setup
+#+BEGIN_SRC text
+Context: We are starting a new Android project named "Jotly".
+Goal: Initialize a basic Android project using Kotlin and Jetpack Compose, and configure the Nix build environment.
+Requirements:
+1. Initialize the Android project:
+   - Use the latest stable version of Android Studio/Gradle plugins.
+   - Setup Jetpack Compose for the UI.
+   - Setup Hilt for Dependency Injection.
+   - Setup JUnit 4/5 and Espresso dependencies.
+   - Ensure the project builds and runs a "Hello World" screen.
+2. Configure Nix Flakes:
+   - Initialize a `flake.nix` using `flake-parts`.
+   - Configure a devShell providing `jdk`, `android-studio`, `gradle`, and `android-tools` (adb, etc).
+   - Integrate `cachix/git-hooks.nix` for pre-commit hooks (e.g., ktlint, detekt).
+   - Ensure `nix develop` drops into a usable environment.
+
+Action: Create the initial project structure, build.gradle files, and Nix configuration.
+#+END_SRC
+
+** Step 2: File System Abstraction
+#+BEGIN_SRC text
+Context: We need to read and write raw text files and manage file paths.
+Goal: Create a `FileService` to handle low-level I/O operations safely.
+Requirements:
+1. Create an interface `FileService`.
+2. Implement `RealFileService` that can:
+   - Read the content of a file given a path (returning `Result<String>`).
+   - Write content to a file given a path (returning `Result<Unit>`).
+   - Check if a file exists.
+   - Create a directory if it doesn't exist.
+3. Use Kotlin's `java.io.File` or `java.nio`.
+4. Create a Unit Test `FileServiceTest` using a temporary folder to verify reading/writing/existence checks work correctly.
+#+END_SRC
+
+** Step 3: User Preferences (File Path Storage)
+#+BEGIN_SRC text
+Context: The user needs to store the path to their `Journelly.org` file.
+Goal: Implement persistence for the user's chosen file path.
+Requirements:
+1. Add Jetpack DataStore preferences dependency.
+2. Create `UserPreferencesRepository`.
+3. Implement `getJournalPath(): Flow<String?>` and `setJournalPath(path: String)`.
+4. Create a Unit Test verifying the flow emits the saved values.
+#+END_SRC
+
+* Phase 2: Domain Logic (Org Mode Parsing)
+** Step 4: Domain Model & Basic Parser
+#+BEGIN_SRC text
+Context: We need to parse Org mode files. An entry starts with a timestamp or header.
+Goal: Create the data model and a parser for basic text entries.
+Requirements:
+1. Create a data class `JournalEntry(val id: String, val date: LocalDateTime, val content: String)`.
+   - Note: Use the date as the ID source or generate a UUID.
+2. Create `OrgParser` object/class.
+3. Implement `parse(content: String): List<JournalEntry>`.
+   - Assume entries start with `* Date format...` or just a timestamp line depending on Journelly's format (Standard Org uses `*`).
+   - For now, handle the standard Org date format: `* <2025-12-02 Tue> Title/Summary`.
+4. Create `OrgParserTest`. Provide a sample Org string with 2 entries and assert they are parsed into correct `JournalEntry` objects.
+#+END_SRC
+
+** Step 5: Parser Serialization (Round Trip)
+#+BEGIN_SRC text
+Context: We need to save new entries back to the file.
+Goal: specific functionality to convert a `JournalEntry` back to Org string format.
+Requirements:
+1. Add `toOrgString(entry: JournalEntry): String` to `OrgParser`.
+2. Ensure the output format matches the input format expected by the parser.
+3. Update `OrgParserTest` to verify a "Round Trip": `parse(toOrgString(entry)) == entry`.
+#+END_SRC
+
+** Step 6: Journal Repository
+#+BEGIN_SRC text
+Context: Coordinate between the raw file and the parsed objects.
+Goal: Create `JournalRepository`.
+Requirements:
+1. Inject `FileService`, `UserPreferencesRepository`, and `OrgParser` into `JournalRepository`.
+2. Implement `getEntries(): Flow<List<JournalEntry>>`.
+   - It should read the path from preferences, read the file, parse it, and emit the list.
+3. Implement `addEntry(entry: JournalEntry)`.
+   - It should read the file, append the new entry string, and write it back.
+4. Create a Test Double for `FileService` and `Preferences` to unit test the Repository logic without real files.
+#+END_SRC
+
+* Phase 3: Setup UI Flow
+** Step 7: Onboarding Logic (ViewModel)
+#+BEGIN_SRC text
+Context: When the app starts, we need to know if a file is selected and valid.
+Goal: Create `OnboardingViewModel`.
+Requirements:
+1. Implement `state` that reflects: `Loading`, `PathNeeded`, `FileMissing(path)`, `Ready`.
+2. On init, check `UserPreferencesRepository`.
+3. If path is null -> `PathNeeded`.
+4. If path exists but file missing -> `FileMissing`.
+5. If file exists -> `Ready`.
+6. Add method `setPath(path: String)` which validates and saves.
+7. Add method `createFile(path: String)` which uses `FileService` to create an empty file.
+8. Unit test these states.
+#+END_SRC
+
+** Step 8: Onboarding UI
+#+BEGIN_SRC text
+Context: Visual interface for the logic created in Step 7.
+Goal: Create `OnboardingScreen`.
+Requirements:
+1. Create a Composable `OnboardingScreen` that observes the ViewModel.
+2. UI States:
+   - Button to "Select File" (Use Android System File Picker contract).
+   - If "FileMissing", show a prompt: "File not found. Create new?"
+3. Wire up the System File Picker to call `viewModel.setPath`.
+#+END_SRC
+
+** Step 9: Navigation Wiring
+#+BEGIN_SRC text
+Context: The app needs to decide which screen to show on launch.
+Goal: Setup Navigation Graph.
+Requirements:
+1. Create a `MainActivity` that hosts a `NavHost`.
+2. Define routes: "onboarding", "home".
+3. Use a `MainViewModel` or `LauncherEffect` to check preferences.
+   - If path is set -> Navigate "home".
+   - Else -> Navigate "onboarding".
+4. Ensure the Onboarding screen navigates to Home upon "Ready" state.
+#+END_SRC
+
+* Phase 4: Main Feed Feature
+** Step 10: Entry Card UI
+#+BEGIN_SRC text
+Context: Displaying a single journal entry.
+Goal: Create `EntryCard` Composable.
+Requirements:
+1. Create `EntryCard(entry: JournalEntry)`.
+2. Display Date formatted nicely (e.g., "Tue, Dec 2").
+3. Display Content body.
+4. Handle Markdown-like styling if possible, or just plain text for now.
+5. Create a `@Preview` with dummy data.
+#+END_SRC
+
+** Step 11: Feed Screen
+#+BEGIN_SRC text
+Context: The main list of entries.
+Goal: Create `FeedScreen` and `FeedViewModel`.
+Requirements:
+1. `FeedViewModel` calls `JournalRepository.getEntries()`.
+2. `FeedScreen` uses `LazyColumn` to render a list of `EntryCard`.
+3. Add a Floating Action Button (FAB) with a "+" icon (Action to be defined later).
+4. Handle "Loading" and "Empty" states (e.g., "No entries yet").
+#+END_SRC
+
+* Phase 5: Writing Entries
+** Step 12: Editor UI
+#+BEGIN_SRC text
+Context: User wants to write a new note.
+Goal: Create `EditorScreen`.
+Requirements:
+1. Create `EditorScreen` with a `TextField` taking up most of the screen.
+2. Add a "Save" button in the TopAppBar.
+3. Manage local state for the text input.
+4. Handle system back press (maybe prompt to discard if dirty?).
+#+END_SRC
+
+** Step 13: Saving Logic
+#+BEGIN_SRC text
+Context: Connecting the Editor to the Data Layer.
+Goal: Update `EditorViewModel` and Repository.
+Requirements:
+1. `EditorViewModel` should have a `saveEntry(content: String)` function.
+2. This creates a `JournalEntry` with `LocalDateTime.now()` and calls `repository.addEntry()`.
+3. Wire `FeedScreen` FAB to navigate to `EditorScreen`.
+4. On Save success, pop back stack to `FeedScreen`.
+#+END_SRC
+
+* Phase 6: Image Asset Support
+** Step 14: Asset Infrastructure
+#+BEGIN_SRC text
+Context: Images need to be stored in a specific subfolder.
+Goal: Create `AssetRepository`.
+Requirements:
+1. `AssetRepository` needs the base journal path.
+2. Implement `saveImage(uri: Uri): String`.
+   - Calculates path: `JournalPath.assets/images/UUID.jpg`.
+   - Copies data from Uri to that path.
+   - Returns the *relative* path or filename to be stored in the text file.
+#+END_SRC
+
+** Step 15: Parsing Images
+#+BEGIN_SRC text
+Context: Org mode links `[[file:path.jpg]]` need to be recognized.
+Goal: Update `JournalEntry` and `OrgParser`.
+Requirements:
+1. Update `JournalEntry` to have a list of `images: List<String>` or keep it in content.
+   - Better approach: Keep in content, but have a Helper to extract image paths for the UI.
+2. Create a Regex helper to find `[[file:(.*?)]]`.
+3. Test that the parser leaves the string as is, but we can extract the path.
+#+END_SRC
+
+** Step 16: Image UI Integration
+#+BEGIN_SRC text
+Context: Users need to see images in the feed and add them in the editor.
+Goal: Update UI components.
+Requirements:
+1. Update `EntryCard`: Parse content for image links. If found, load the image using Coil or Glide.
+   - Note: Need to resolve relative path against the absolute parent folder.
+2. Update `EditorScreen`: Add an "Add Image" button.
+   - Use `ActivityResultContracts.GetContent()`.
+   - On selection, call `AssetRepository.saveImage`.
+   - Insert `[[file:relative_path.jpg]]` into the text field at cursor position.
+#+END_SRC
+
+* Phase 7: Polish
+** Step 17: Deletion & Swipe
+#+BEGIN_SRC text
+Context: Managing entries.
+Goal: Implement Delete functionality.
+Requirements:
+1. Add `deleteEntry(entry: JournalEntry)` to `JournalRepository`.
+   - This requires reading the file, filtering out the entry (matching by ID/Date), and rewriting the file.
+2. Add Swipe-to-dismiss behavior to `FeedScreen`'s LazyColumn.
+3. Call ViewModel delete function on swipe.
+#+END_SRC
